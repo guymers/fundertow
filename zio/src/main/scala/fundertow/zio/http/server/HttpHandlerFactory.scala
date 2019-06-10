@@ -18,13 +18,17 @@ import io.undertow.io.Sender
 import io.undertow.server.HttpHandler
 import io.undertow.server.HttpServerExchange
 import io.undertow.util.SameThreadExecutor
+import org.xnio.IoUtils
+import org.xnio.channels.StreamSourceChannel
 import scalaz.zio.stream.ZSink
 import scalaz.zio.stream.ZStream
 import scalaz.zio.Exit
 import scalaz.zio.Runtime
 import scalaz.zio.Task
 import scalaz.zio.TaskR
+import scalaz.zio.UIO
 import scalaz.zio.ZIO
+import scalaz.zio.ZManaged
 
 object HttpHandlerFactory {
 
@@ -59,9 +63,19 @@ object HttpHandlerFactory {
   def stream[R](runtime: Runtime[R])(
     f: Request[ZStream[Any, Throwable, ?]] => ZIO[R, Throwable, Response[ZStream[Any, Throwable, ?]]]
   ): HttpHandler = createHttpHandler(runtime) { exchange =>
+    val channel = {
+      val acquire = ZIO.effect(exchange.getRequestChannel)
+      def release(channel: StreamSourceChannel): UIO[Unit] = {
+        ZIO.effectTotal {
+          IoUtils.safeShutdownReads(channel)
+        }
+      }
+      ZManaged.make(acquire)(release)
+    }
+
     val body = StreamSourceChannelHelper.stream(
       exchange.getConnection.getByteBufferPool,
-      ZIO.effect(exchange.getRequestChannel),
+      channel,
       capacity = 128 // FIXME hard coded
     )
     val request = Request(

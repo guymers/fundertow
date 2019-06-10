@@ -125,7 +125,7 @@ trait App extends ZIOApp {
   private def createXNioRuntime(worker: XnioWorker): Runtime[Environment] = {
     val executor = createScalazExecutor(worker)
     val platform = PlatformLive.fromExecutor(executor)
-      .withReportFailure(cause => if (!cause.interrupted) println(cause.toString)) // TODO?
+      .withReportFailure(cause => if (!cause.interrupted) println(cause.toString)) // TODO
     val environment: Environment = new Clock.Live with Console.Live with System.Live with Random.Live with Blocking.Live
     Runtime(environment, platform)
   }

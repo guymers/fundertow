@@ -1,5 +1,5 @@
-val zioVersion = "1.0-RC4"
-val scalaTestVersion = "3.0.7"
+val zioVersion = "1.0-RC5"
+val undertowVersion = "2.0.21.Final"
 
 lazy val IntegrationTest = config("it") extend Test
 
@@ -46,7 +46,7 @@ lazy val commonSettings = Seq(
   dependencyOverrides += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
 
   addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"),
-  addCompilerPlugin("org.typelevel" % "kind-projector" % "0.10.0" cross CrossVersion.binary),
+  addCompilerPlugin("org.typelevel" % "kind-projector" % "0.10.2" cross CrossVersion.binary),
 )
 
 lazy val fundertow = project.in(file("."))
@@ -60,12 +60,10 @@ lazy val core = project.in(file("core"))
   .settings(commonSettings)
   .settings(Seq(
     libraryDependencies ++= Seq(
-      "io.undertow" % "undertow-core" % "2.0.20.Final",
+      "io.undertow" % "undertow-core" % undertowVersion,
 
       "org.scalaz" %% "scalaz-zio" % zioVersion % Optional,
       "org.scalaz" %% "scalaz-zio-streams" % zioVersion % Optional,
-
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
     ),
   ))
 
@@ -76,8 +74,6 @@ lazy val zio = project.in(file("zio"))
     libraryDependencies ++= Seq(
       "org.scalaz" %% "scalaz-zio" % zioVersion,
       "org.scalaz" %% "scalaz-zio-streams" % zioVersion,
-
-      "org.scalatest" %% "scalatest" % scalaTestVersion % Test
     ),
   ))
   .dependsOn(core)
@@ -93,4 +89,3 @@ lazy val example = project.in(file("example"))
     ),
   )
   .dependsOn(zio)
-
