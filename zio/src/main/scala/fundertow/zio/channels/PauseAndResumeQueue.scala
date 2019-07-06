@@ -1,6 +1,6 @@
 package fundertow.zio.channels
 
-import scalaz.zio._
+import zio._
 
 object PauseAndResumeQueue {
 

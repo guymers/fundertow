@@ -16,12 +16,12 @@ object ResponseBodyEncoder {
 
   // orphans; see https://blog.7mind.io/no-more-orphans.html
   // FIXME test this
-  implicit val stringUTF8ZIO: ResponseBodyEncoder[scalaz.zio.Task, String] = {
-    stringUTF8F(scalaz.zio.Task.succeed)
+  implicit val stringUTF8ZIO: ResponseBodyEncoder[zio.Task, String] = {
+    stringUTF8F(zio.Task.succeed)
   }
 
-  implicit val stringUTF8ZStream: ResponseBodyEncoder[scalaz.zio.stream.ZStream[Any, Throwable, ?], String] = {
-    stringUTF8F(scalaz.zio.stream.ZStream.succeed)
+  implicit val stringUTF8ZStream: ResponseBodyEncoder[zio.stream.ZStream[Any, Throwable, ?], String] = {
+    stringUTF8F(zio.stream.ZStream.succeed)
   }
 }
 

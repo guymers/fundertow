@@ -13,24 +13,24 @@ import org.xnio.OptionMap
 import org.xnio.Options
 import org.xnio.Xnio
 import org.xnio.XnioWorker
-import scalaz.zio.Runtime
-import scalaz.zio.TaskR
-import scalaz.zio.UIO
-import scalaz.zio.ZIO
-import scalaz.zio.ZManaged
-import scalaz.zio.blocking.Blocking
-import scalaz.zio.clock.Clock
-import scalaz.zio.console.Console
-import scalaz.zio.internal.ExecutionMetrics
-import scalaz.zio.internal.Executor
-import scalaz.zio.internal.Platform
-import scalaz.zio.internal.PlatformLive
-import scalaz.zio.random.Random
-import scalaz.zio.system.System
-import scalaz.zio.{App => ZIOApp}
+import zio.Runtime
+import zio.TaskR
+import zio.UIO
+import zio.ZIO
+import zio.ZManaged
+import zio.blocking.Blocking
+import zio.clock.Clock
+import zio.console.Console
+import zio.internal.ExecutionMetrics
+import zio.internal.Executor
+import zio.internal.Platform
+import zio.internal.PlatformLive
+import zio.random.Random
+import zio.system.System
+import zio.{App => ZIOApp}
 
 trait App extends ZIOApp {
-  import scalaz.zio.console.putStrLn
+  import zio.console.putStrLn
 
   private val NumProcs = java.lang.Runtime.getRuntime.availableProcessors.max(2)
   val numIoThreads: Int = NumProcs * 2 // "Two IO threads per CPU core is a reasonable default."
@@ -57,7 +57,7 @@ trait App extends ZIOApp {
 
     def release(worker: XnioWorker): ZIO[Console with Blocking, Nothing, Unit] = {
       val task = for {
-        terminated <- scalaz.zio.blocking.effectBlocking {
+        terminated <- zio.blocking.effectBlocking {
           ThreadPoolHelpers.shutdownAndAwaitTermination(worker, 5.seconds)
         }
         _ <- if (!terminated) {
@@ -95,14 +95,14 @@ trait App extends ZIOApp {
 
       val task = for {
         _ <- putStrLn("Server shutdown starting")
-        shutdown <- scalaz.zio.blocking.effectBlocking {
+        shutdown <- zio.blocking.effectBlocking {
           shutdownHandler.shutdown()
           shutdownHandler.awaitShutdown(60.seconds.toMillis)
         }
         _ <- if (!shutdown) {
           putStrLn("All requests did not complete after waiting 60 seconds")
         } else UIO.unit
-        _ <- scalaz.zio.blocking.effectBlocking {
+        _ <- zio.blocking.effectBlocking {
           server.stop()
         }
         _ <- putStrLn("Server shutdown complete")

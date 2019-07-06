@@ -1,10 +1,10 @@
 package testzio
 
-import scalaz.zio.ZIO
-import scalaz.zio.console
-import scalaz.zio.clock
+import zio.ZIO
+import zio.console
+import zio.clock
 
-trait Runner extends scalaz.zio.App {
+trait Runner extends zio.App {
 
   def suites: List[Suite[Environment]]
 

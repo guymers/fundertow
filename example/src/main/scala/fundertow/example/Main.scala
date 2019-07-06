@@ -16,12 +16,12 @@ import io.undertow.server.RoutingHandler
 import io.undertow.server.handlers.HttpContinueAcceptingHandler
 import io.undertow.util.Headers
 import org.slf4j.LoggerFactory
-import scalaz.zio.Chunk
-import scalaz.zio.ZIO
-import scalaz.zio.Runtime
-import scalaz.zio.Task
-import scalaz.zio.stream.ZSink
-import scalaz.zio.stream.ZStream
+import zio.Chunk
+import zio.ZIO
+import zio.Runtime
+import zio.Task
+import zio.stream.ZSink
+import zio.stream.ZStream
 
 object Main extends App {
 

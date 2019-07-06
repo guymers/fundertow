@@ -6,10 +6,10 @@ import scala.concurrent.duration._
 
 import io.undertow.connector.ByteBufferPool
 import io.undertow.server.DefaultByteBufferPool
-import scalaz.zio.ZIO
-import scalaz.zio.ZManaged
-import scalaz.zio.duration.{Duration => ZDuration}
 import testzio._
+import zio.ZIO
+import zio.ZManaged
+import zio.duration.{Duration => ZDuration}
 
 object StreamSourceChannelHelperTest {
 

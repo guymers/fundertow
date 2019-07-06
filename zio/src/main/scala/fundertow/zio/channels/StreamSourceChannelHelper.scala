@@ -7,12 +7,12 @@ import io.undertow.connector.PooledByteBuffer
 import org.xnio.ChannelListener
 import org.xnio.IoUtils
 import org.xnio.channels.StreamSourceChannel
-import scalaz.zio.Exit
-import scalaz.zio.Promise
-import scalaz.zio.UIO
-import scalaz.zio.ZIO
-import scalaz.zio.ZManaged
-import scalaz.zio.stream.ZStream
+import zio.Exit
+import zio.Promise
+import zio.UIO
+import zio.ZIO
+import zio.ZManaged
+import zio.stream.ZStream
 
 object StreamSourceChannelHelper {
 

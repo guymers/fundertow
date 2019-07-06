@@ -1,6 +1,6 @@
-import scalaz.zio.ZIO
-import scalaz.zio.ZManaged
-import scalaz.zio.console.Console
+import zio.ZIO
+import zio.ZManaged
+import zio.console.Console
 
 package object testzio {
 

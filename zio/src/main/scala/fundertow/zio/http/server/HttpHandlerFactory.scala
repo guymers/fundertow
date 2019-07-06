@@ -20,15 +20,9 @@ import io.undertow.server.HttpServerExchange
 import io.undertow.util.SameThreadExecutor
 import org.xnio.IoUtils
 import org.xnio.channels.StreamSourceChannel
-import scalaz.zio.stream.ZSink
-import scalaz.zio.stream.ZStream
-import scalaz.zio.Exit
-import scalaz.zio.Runtime
-import scalaz.zio.Task
-import scalaz.zio.TaskR
-import scalaz.zio.UIO
-import scalaz.zio.ZIO
-import scalaz.zio.ZManaged
+import zio._
+import zio.stream.ZSink
+import zio.stream.ZStream
 
 object HttpHandlerFactory {
 
