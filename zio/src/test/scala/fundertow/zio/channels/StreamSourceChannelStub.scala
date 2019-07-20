@@ -26,8 +26,12 @@ class StreamSourceChannelStub(data: List[Array[Byte]]) extends StreamSourceChann
 
   var remaining: List[Array[Byte]] = data
 
-  private var readListener: ChannelListener[_ >: StreamSourceChannel] = _
-  private var closeListener: ChannelListener[_ >: StreamSourceChannel] = _
+  private val readListenerSetter: ChannelListener.SimpleSetter[StreamSourceChannel] = {
+    new ChannelListener.SimpleSetter
+  }
+  private val closeListenerSetter: ChannelListener.SimpleSetter[StreamSourceChannel] = {
+    new ChannelListener.SimpleSetter
+  }
 
   override def transferTo(position: Long, count: Long, target: FileChannel): Long = ???
   override def transferTo(count: Long, throughBuffer: ByteBuffer, target: StreamSinkChannel): Long = ???
@@ -37,26 +41,18 @@ class StreamSourceChannelStub(data: List[Array[Byte]]) extends StreamSourceChann
     val r = new Runnable() {
       override def run(): Unit = {
         Thread.sleep(delay.toMillis)
-        readListener.handleEvent(channel)
+        readListenerSetter.get().handleEvent(channel)
       }
     }
     new Thread(r).start()
   }
 
   def callCloseSetter(): Unit = {
-    closeListener.handleEvent(this)
+    closeListenerSetter.get().handleEvent(this)
   }
 
-  override val getReadSetter: ChannelListener.Setter[_ <: StreamSourceChannel] = {
-    (listener: ChannelListener[_ >: StreamSourceChannel]) => {
-      readListener = listener
-    }
-  }
-  override val getCloseSetter: ChannelListener.Setter[_ <: StreamSourceChannel] = {
-    (listener: ChannelListener[_ >: StreamSourceChannel]) => {
-      closeListener = listener
-    }
-  }
+  override def getReadSetter: ChannelListener.Setter[_ <: StreamSourceChannel] = readListenerSetter
+  override val getCloseSetter: ChannelListener.Setter[_ <: StreamSourceChannel] = closeListenerSetter
 
   override def read(dsts: Array[ByteBuffer], offset: Int, length: Int): Long = ???
   override def read(dsts: Array[ByteBuffer]): Long = ???
@@ -86,8 +82,8 @@ class StreamSourceChannelStub(data: List[Array[Byte]]) extends StreamSourceChann
   override def resumeReads(): Unit = {
     resumeReadsCalled.getAndAdd(1)
     readResumed.set(true)
-    if (readListener != null) {
-      readListener.handleEvent(this)
+    if (readListenerSetter.get() != null) {
+      readListenerSetter.get().handleEvent(this)
     }
   }
   override def isReadResumed: Boolean = readResumed.get()
@@ -108,8 +104,8 @@ class StreamSourceChannelStub(data: List[Array[Byte]]) extends StreamSourceChann
   override def isOpen: Boolean = !closed.get()
   override def close(): Unit = {
     closed.set(true)
-    if (closeListener != null) {
-      closeListener.handleEvent(this)
+    if (closeListenerSetter.get() != null) {
+      closeListenerSetter.get().handleEvent(this)
     }
   }
 }

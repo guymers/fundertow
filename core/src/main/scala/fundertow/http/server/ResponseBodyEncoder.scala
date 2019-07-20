@@ -21,7 +21,8 @@ object ResponseBodyEncoder {
   }
 
   implicit val stringUTF8ZStream: ResponseBodyEncoder[zio.stream.ZStream[Any, Throwable, ?], String] = {
-    stringUTF8F(zio.stream.ZStream.succeed)
+    // explict type for Scala 2.11
+    stringUTF8F[zio.stream.ZStream[Any, Throwable, ?]](zio.stream.ZStream.succeed)
   }
 }
 

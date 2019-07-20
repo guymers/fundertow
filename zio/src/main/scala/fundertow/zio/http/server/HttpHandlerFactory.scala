@@ -21,7 +21,6 @@ import io.undertow.util.SameThreadExecutor
 import org.xnio.IoUtils
 import org.xnio.channels.StreamSourceChannel
 import zio._
-import zio.stream.ZSink
 import zio.stream.ZStream
 
 object HttpHandlerFactory {
@@ -130,58 +129,53 @@ object HttpHandlerFactory {
     }
   }
 
-  private def setResponseHeaders[F[_]](exchange: HttpServerExchange, response: Response[F]): Task[Unit] = for {
-    _ <- ZIO.effectTotal {
-      exchange.setStatusCode(response.status.code)
-    }
-    _ <- ZIO.effectTotal {
-      response.headers.iterator.foreach { value =>
-        exchange.getResponseHeaders.putAll(value.getHeaderName, value.iterator().asScala.toList.asJavaCollection)
-      }
-    }
-  } yield ()
-
-  private def sendResponse(
+  private def sendResponse[R, E >: IOException](
     exchange: HttpServerExchange,
-    response: Response[Task]
-  ): Task[Unit] = for {
+    response: Response[ZIO[R, E, ?]]
+  ): ZIO[R, E, Unit] = for {
     _ <- setResponseHeaders(exchange, response)
     sender <- ZIO.effectTotal {
       exchange.getResponseSender
     }
     result <- response.body.flatMap { data =>
-      performIoCallbackAction(sender.send(ByteBuffer.wrap(data), _))
+      performIoCallback(sender.send(ByteBuffer.wrap(data), _))
     }
-    _ <- {
-      performIoCallbackAction(sender.close(_))
-    }
+    _ <- performIoCallback(sender.close(_))
   } yield result
 
-  private def streamResponse(
+  private def streamResponse[R, E >: IOException](
     exchange: HttpServerExchange,
-    response: Response[ZStream[Any, Throwable, ?]]
-  ): Task[Unit] = for {
+    response: Response[ZStream[R, E, ?]]
+  ): ZIO[R, E, Unit] = for {
     _ <- setResponseHeaders(exchange, response)
     sender <- ZIO.effectTotal {
       exchange.getResponseSender
     }
-    result <- response.body
-      .mapM { data =>
-        performIoCallbackAction(sender.send(ByteBuffer.wrap(data), _))
+    result <- {
+      val s = response.body.mapM { data =>
+        performIoCallback(sender.send(ByteBuffer.wrap(data), _))
+      } ++ ZStream.fromEffect {
+        performIoCallback(sender.close(_))
       }
-      .++(
-        ZStream.fromEffect {
-          performIoCallbackAction(sender.close(_))
-        }
-      )
-      .run(ZSink.drain)
-
+      s.runDrain
+    }
   } yield result
 
-  private def performIoCallbackAction(action: IoCallback => Unit): ZIO[Any, IOException, Unit] = {
+  private def setResponseHeaders[R, E, F[_, _, _]](
+    exchange: HttpServerExchange,
+    response: Response[F[R, E, ?]]
+  ): ZIO[R, E, Unit] = ZIO.effectTotal {
+    exchange.setStatusCode(response.status.code)
+
+    response.headers.iterator.foreach { value =>
+      exchange.getResponseHeaders.putAll(value.getHeaderName, value.iterator().asScala.toList.asJavaCollection)
+    }
+  }
+
+  private def performIoCallback(f: IoCallback => Unit): ZIO[Any, IOException, Unit] = {
     Task.effectAsync { cb: (ZIO[Any, IOException, Unit] => Unit) =>
-      action(new IoCallback {
-        override def onComplete(exchange: HttpServerExchange, s: Sender): Unit = cb(ZIO.succeed(()))
+      f(new IoCallback {
+        override def onComplete(exchange: HttpServerExchange, s: Sender): Unit = cb(ZIO.unit)
         override def onException(exchange: HttpServerExchange, s: Sender, e: IOException): Unit = cb(ZIO.fail(e))
       })
     }

@@ -29,7 +29,7 @@ object TestResults {
   def combine(r1: TestResults, r2: TestResults): TestResults = TestResults(
     passed = r1.passed + r2.passed,
     failed = r1.failed + r2.failed,
-    errors = r1.errors + r2.errors,
+    errors = r1.errors + r2.errors
   )
 
   def combineMany(r: TestResults, rs: List[TestResults]): TestResults = {

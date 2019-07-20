@@ -15,7 +15,7 @@ object PauseAndResumeQueue {
     pausedR <- Ref.make(false)
     pausedS <- Semaphore.make(1)
     _ <- ZIO.effectTotal(require(capacity >= 8)) // FIXME
-    q <- ZQueue.bounded[A](capacity)
+    q <- Queue.bounded[A](capacity)
   } yield {
     val safePause = pausedS.withPermit(for {
       paused <- pausedR.get
@@ -34,7 +34,7 @@ final class PauseAndResumeQueue[+E, A] private (
   q: Queue[A],
   paused: Ref[Boolean],
   val pause: ZIO[Any, E, Unit],
-  val resume: ZIO[Any, E, Unit],
+  val resume: ZIO[Any, E, Unit]
 ) {
   private val high: Int = q.capacity - (q.capacity * 5 / 100).max(4)
   private val low: Int = high / 2

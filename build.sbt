@@ -1,11 +1,11 @@
-val zioVersion = "1.0.0-RC9"
+val zioVersion = "1.0.0-RC10-1"
 val undertowVersion = "2.0.22.Final"
 
 lazy val IntegrationTest = config("it") extend Test
 
 lazy val commonSettings = Seq(
   scalaVersion := "2.12.8",
-  crossScalaVersions := Seq("2.11.12", scalaVersion.value),
+  crossScalaVersions := Seq("2.11.12", scalaVersion.value, "2.13.0"),
 
   // https://tpolecat.github.io/2017/04/25/scalac-flags.html
   scalacOptions ++= Seq(
@@ -18,23 +18,39 @@ lazy val commonSettings = Seq(
     "-language:implicitConversions",
     "-unchecked",
     "-Xcheckinit",
-    //    "-Xfatal-warnings",
-    "-Xfuture",
-    "-Xlint",
-    "-Yno-adapted-args",
-    "-Ypartial-unification",
-    "-Ywarn-dead-code",
-    "-Ywarn-inaccessible",
-    "-Ywarn-infer-any",
-    "-Ywarn-nullary-override",
-    "-Ywarn-nullary-unit",
-    "-Ywarn-numeric-widen",
-    "-Ywarn-unused",
-    "-Ywarn-value-discard"
+    //"-Xfatal-warnings",
   ),
   scalacOptions ++= (CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, minor)) if minor >= 12 => Seq("-Ywarn-extra-implicit")
-    case _ => Seq.empty
+    case Some((2, minor)) if minor < 12 => Seq(
+      "-Ypartial-unification",
+    )
+    case Some((2, minor)) if minor == 12 => Seq(
+      "-Xfuture",
+      "-Xlint",
+      "-Yno-adapted-args",
+      "-Ypartial-unification",
+      "-Ywarn-dead-code",
+      "-Ywarn-extra-implicit",
+      "-Ywarn-inaccessible",
+      "-Ywarn-infer-any",
+      "-Ywarn-nullary-override",
+      "-Ywarn-nullary-unit",
+      "-Ywarn-numeric-widen",
+      "-Ywarn-unused",
+      "-Ywarn-value-discard",
+    )
+    case _ => Seq(
+      "-Wdead-code",
+      "-Wextra-implicit",
+      "-Wnumeric-widen",
+      "-Wunused:implicits",
+      "-Wunused:imports",
+      "-Wunused:locals",
+      "-Wunused:params",
+      "-Wunused:patvars",
+      "-Wunused:privates",
+      "-Wvalue-discard"
+    )
   }),
 
   scalacOptions in (Compile, console) --= Seq(
@@ -42,10 +58,10 @@ lazy val commonSettings = Seq(
     "-Ywarn-unused"
   ),
 
-  dependencyOverrides += "org.scala-lang" % "scala-library" % scalaVersion.value,
-  dependencyOverrides += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+  dependencyOverrides += scalaOrganization.value % "scala-library" % scalaVersion.value,
+  dependencyOverrides += scalaOrganization.value % "scala-reflect" % scalaVersion.value,
 
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"),
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
   addCompilerPlugin("org.typelevel" % "kind-projector" % "0.10.3" cross CrossVersion.binary),
 )
 
@@ -84,7 +100,7 @@ lazy val example = project.in(file("example"))
   .settings(skip in publish := true)
   .settings(
     libraryDependencies ++= Seq(
-      "tech.sparse" %% "trail" % "0.2.0", // TODO
+      "tech.sparse" %% "trail" % "0.2.1", // TODO
       "ch.qos.logback" % "logback-classic" % "1.2.3",
     ),
   )
