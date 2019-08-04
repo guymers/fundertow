@@ -1,7 +1,25 @@
 val zioVersion = "1.0.0-RC10-1"
-val undertowVersion = "2.0.22.Final"
+val undertowVersion = "2.0.23.Final"
 
 lazy val IntegrationTest = config("it") extend Test
+
+val warnUnused = Seq(
+  "explicits",
+  "implicits",
+  "imports",
+  "locals",
+  "params",
+  "patvars",
+  "privates",
+)
+
+def filterScalacConsoleOpts(options: Seq[String]) = {
+  options.filterNot { opt =>
+    opt == "-Xfatal-warnings" ||
+      opt.startsWith("-Ywarn-") ||
+      opt.startsWith("-W")
+  }
+}
 
 lazy val commonSettings = Seq(
   scalaVersion := "2.12.8",
@@ -26,37 +44,31 @@ lazy val commonSettings = Seq(
     )
     case Some((2, minor)) if minor == 12 => Seq(
       "-Xfuture",
-      "-Xlint",
+      "-Xlint:_",
       "-Yno-adapted-args",
       "-Ypartial-unification",
+
       "-Ywarn-dead-code",
       "-Ywarn-extra-implicit",
-      "-Ywarn-inaccessible",
       "-Ywarn-infer-any",
       "-Ywarn-nullary-override",
       "-Ywarn-nullary-unit",
       "-Ywarn-numeric-widen",
-      "-Ywarn-unused",
-      "-Ywarn-value-discard",
-    )
+      "-Ywarn-value-discard"
+    ) ++ warnUnused.map(o => s"-Ywarn-unused:$o")
     case _ => Seq(
+      "-Xlint:_",
+
       "-Wdead-code",
       "-Wextra-implicit",
       "-Wnumeric-widen",
-      "-Wunused:implicits",
-      "-Wunused:imports",
-      "-Wunused:locals",
-      "-Wunused:params",
-      "-Wunused:patvars",
-      "-Wunused:privates",
-      "-Wvalue-discard"
-    )
+      "-Woctal-literal",
+      "-Wself-implicit",
+      "-Wvalue-discard",
+    ) ++ warnUnused.map(o => s"-Wunused:$o")
   }),
-
-  scalacOptions in (Compile, console) --= Seq(
-    "-Xfatal-warnings",
-    "-Ywarn-unused"
-  ),
+  scalacOptions in (Compile, console) ~= filterScalacConsoleOpts,
+  scalacOptions in (Test, console) ~= filterScalacConsoleOpts,
 
   dependencyOverrides += scalaOrganization.value % "scala-library" % scalaVersion.value,
   dependencyOverrides += scalaOrganization.value % "scala-reflect" % scalaVersion.value,
