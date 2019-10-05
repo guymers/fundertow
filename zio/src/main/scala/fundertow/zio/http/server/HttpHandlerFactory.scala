@@ -85,7 +85,7 @@ object HttpHandlerFactory {
   }
 
   private def createHttpHandler[R](runtime: Runtime[R])(
-    performResponse: HttpServerExchange => TaskR[R, Unit]
+    performResponse: HttpServerExchange => RIO[R, Unit]
   ): HttpHandler = new HttpHandler {
     override def handleRequest(exchange: HttpServerExchange): Unit = {
       val t = performResponse(exchange).onError { cause =>
@@ -173,7 +173,7 @@ object HttpHandlerFactory {
   }
 
   private def performIoCallback(f: IoCallback => Unit): ZIO[Any, IOException, Unit] = {
-    Task.effectAsync { cb: (ZIO[Any, IOException, Unit] => Unit) =>
+    ZIO.effectAsync { cb: (ZIO[Any, IOException, Unit] => Unit) =>
       f(new IoCallback {
         override def onComplete(exchange: HttpServerExchange, s: Sender): Unit = cb(ZIO.unit)
         override def onException(exchange: HttpServerExchange, s: Sender, e: IOException): Unit = cb(ZIO.fail(e))

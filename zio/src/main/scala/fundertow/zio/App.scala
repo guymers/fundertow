@@ -13,11 +13,7 @@ import org.xnio.OptionMap
 import org.xnio.Options
 import org.xnio.Xnio
 import org.xnio.XnioWorker
-import zio.Runtime
-import zio.TaskR
-import zio.UIO
-import zio.ZIO
-import zio.ZManaged
+import zio._
 import zio.blocking.Blocking
 import zio.clock.Clock
 import zio.console.Console
@@ -45,12 +41,12 @@ trait App extends ZIOApp {
         ZIO.never
       }
     }.catchAll { e =>
-      onError("run error", e).const(1)
+      onError("run error", e).as(1)
     }
   }
 
   private def workerManaged: ZManaged[Console with Blocking, Throwable, XnioWorker] = {
-    val acquire: TaskR[Console with Blocking, XnioWorker] = ZIO.effect {
+    val acquire: RIO[Console with Blocking, XnioWorker] = ZIO.effect {
       val workerOptions = workerOptionBuilder.getMap
       xnio.createWorker(workerOptions)
     }
@@ -78,7 +74,7 @@ trait App extends ZIOApp {
     worker: XnioWorker,
     handler: HttpHandler
   ): ZManaged[Console with Blocking, Throwable, Undertow] = {
-    val acquire: TaskR[Console with Blocking, (GracefulShutdownHandler, Undertow)] = ZIO.effect {
+    val acquire: RIO[Console with Blocking, (GracefulShutdownHandler, Undertow)] = ZIO.effect {
       val shutdownHandler = new GracefulShutdownHandler(handler)
 
       val server = undertowBuilder

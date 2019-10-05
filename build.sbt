@@ -1,5 +1,5 @@
-val zioVersion = "1.0.0-RC10-1"
-val undertowVersion = "2.0.23.Final"
+val zioVersion = "1.0.0-RC14"
+val undertowVersion = "2.0.26.Final"
 
 lazy val IntegrationTest = config("it") extend Test
 
@@ -16,14 +16,14 @@ val warnUnused = Seq(
 def filterScalacConsoleOpts(options: Seq[String]) = {
   options.filterNot { opt =>
     opt == "-Xfatal-warnings" ||
-      opt.startsWith("-Ywarn-") ||
-      opt.startsWith("-W")
+    opt.startsWith("-Ywarn-") ||
+    opt.startsWith("-W")
   }
 }
 
 lazy val commonSettings = Seq(
-  scalaVersion := "2.12.8",
-  crossScalaVersions := Seq("2.11.12", scalaVersion.value, "2.13.0"),
+  scalaVersion := "2.12.10",
+  crossScalaVersions := Seq("2.11.12", scalaVersion.value, "2.13.1"),
 
   // https://tpolecat.github.io/2017/04/25/scalac-flags.html
   scalacOptions ++= Seq(
@@ -56,7 +56,7 @@ lazy val commonSettings = Seq(
       "-Ywarn-numeric-widen",
       "-Ywarn-value-discard"
     ) ++ warnUnused.map(o => s"-Ywarn-unused:$o")
-    case _ => Seq(
+    case Some((2, minor)) if minor > 12 => Seq(
       "-Xlint:_",
 
       "-Wdead-code",
@@ -66,6 +66,7 @@ lazy val commonSettings = Seq(
       "-Wself-implicit",
       "-Wvalue-discard",
     ) ++ warnUnused.map(o => s"-Wunused:$o")
+    case _ => Seq.empty
   }),
   scalacOptions in (Compile, console) ~= filterScalacConsoleOpts,
   scalacOptions in (Test, console) ~= filterScalacConsoleOpts,
@@ -74,7 +75,7 @@ lazy val commonSettings = Seq(
   dependencyOverrides += scalaOrganization.value % "scala-reflect" % scalaVersion.value,
 
   addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-  addCompilerPlugin("org.typelevel" % "kind-projector" % "0.10.3" cross CrossVersion.binary),
+  addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full),
 )
 
 lazy val fundertow = project.in(file("."))

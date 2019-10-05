@@ -38,7 +38,7 @@ package object testzio {
       ZIO.succeed(Result.error(t))
     }.flatMap { result =>
       val tr = TestResult(::(name, scope), result)
-      printer(tr).const(tr.toResults)
+      printer(tr).as(tr.toResults)
     }
   }
 

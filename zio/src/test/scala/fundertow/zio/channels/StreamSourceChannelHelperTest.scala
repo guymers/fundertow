@@ -50,7 +50,7 @@ object StreamSourceChannelHelperTest {
     in: List[String],
     callReadSetterAfter: Duration = Duration.Undefined
   ) = {
-    val channel = ZManaged.succeedLazy {
+    val channel = ZManaged.effectTotal {
       val channel = new StreamSourceChannelStub(in.map(_.getBytes(StandardCharsets.UTF_8)))
       if (callReadSetterAfter.isFinite) channel.callReadSetter(callReadSetterAfter) else ()
       channel

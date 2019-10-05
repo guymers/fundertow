@@ -46,7 +46,7 @@ final class PauseAndResumeQueue[+E, A] private (
 
   def offer(a: A): ZIO[Any, E, Unit] = {
     size.flatMap(n => if (n > high) pause else ZIO.unit) *>
-      q.offer(a).const(()) // a bounded queue blocks when full, it never returns false
+      q.offer(a).as(()) // a bounded queue blocks when full, it never returns false
   }
   def take: ZIO[Any, E, A] = {
     size.flatMap(n => if (n < low) resume else ZIO.unit) *>

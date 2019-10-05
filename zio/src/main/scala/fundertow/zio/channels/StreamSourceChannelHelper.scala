@@ -13,6 +13,7 @@ import zio.UIO
 import zio.ZIO
 import zio.ZManaged
 import zio.stream.ZStream
+import zio.stream.ZStream.Pull
 
 object StreamSourceChannelHelper {
 
@@ -23,45 +24,34 @@ object StreamSourceChannelHelper {
     channel: ZManaged[R, Throwable, StreamSourceChannel],
     capacity: Int
   ): ZStream[R, Throwable, Array[Byte]] = {
-
     ZStream.managed(channel)
       .mapM { channel => setup(byteBufferPool, channel, capacity) }
       .flatMap { case (completion, queue) =>
-        createStream(completion, queue)
+        new ZStream(process(completion, queue))
       }
   }
 
-  private def createStream[A](
+  // from zio.interop.reactiveStreams.Adapters.process
+  private def process[R, A](
     completion: Promise[Throwable, Unit],
     q: PauseAndResumeQueue[Throwable, A]
-  ): ZStream[Any, Throwable, A] = new ZStream[Any, Throwable, A] {
-    // based on scalaz.zio.interop.reactiveStreams.QueueSubscriber
+  ): ZManaged[R, Throwable, Pull[Any, Throwable, A]] = for {
+    _ <- ZManaged.finalizer(q.shutdown)
+    _ <- completion.await.ensuring(q.size.flatMap(n => if (n <= 0) q.shutdown else UIO.unit)).fork.toManaged_
+  } yield {
+    val take = q.take.flatMap(Pull.emit)
 
-    private def forkQShutdownHook = {
-      completion.await.ensuring(q.size.flatMap(n => if (n <= 0) q.shutdown else UIO.unit)).fork
-    }
-
-    override def fold[R1 <: Any, E1 >: Throwable, A1 >: A, S]: ZStream.Fold[R1, E1, A1, S] = {
-      for {
-        _ <- ZManaged.finalizer(q.shutdown)
-        _ <- forkQShutdownHook.toManaged_
-      } yield { (s: S, cont: S => Boolean, f: (S, A1) => ZIO[R1, E1, S]) =>
-        def loop(s: S): ZIO[R1, E1, S] = {
-          if (!cont(s)) UIO.succeed(s)
-          else {
-            def takeAndLoop = q.take.flatMap(f(s, _)).flatMap(loop)
-            def completeWithS = completion.await.const(s)
-            q.size.flatMap { n =>
-              if (n <= 0) completion.isDone.flatMap {
-                case true => completeWithS
-                case false => takeAndLoop
-              } else takeAndLoop
-            } orElse completeWithS
-          }
-        }
-        loop(s).ensuring(q.shutdown).toManaged_
+    q.size.flatMap { n =>
+      if (n <= 0) completion.isDone.flatMap {
+        case true  => completion.await.foldM(Pull.fail, _ => Pull.end)
+        case false => take
+      } else take
+    }.orElse(
+      completion.poll.flatMap {
+        case None     => Pull.end
+        case Some(io) => io.foldM(Pull.fail, _ => Pull.end)
       }
-    }
+    )
   }
 
   private def setup(byteBufferPool: ByteBufferPool, channel: StreamSourceChannel, capacity: Int) = for {
@@ -124,7 +114,7 @@ object StreamSourceChannelHelper {
         }
         bytesRead <- {
           if (res == -1) {
-            completion.succeed(()).const(res)
+            completion.succeed(()).as(res)
           } else if (res == 0) {
             ZIO.succeed(res)
           } else for {

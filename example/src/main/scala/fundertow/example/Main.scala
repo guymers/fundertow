@@ -45,7 +45,7 @@ object Main extends App {
     router.post("/post/stream", HttpHandlerFactory.stream(runtime) { request =>
       request.body
         .map(Chunk.fromArray)
-        .run(ZSink.foldLeft[Nothing, Chunk[Byte], Chunk[Byte]](Chunk.empty)(_ ++ _))
+        .run(ZSink.foldLeft[Chunk[Byte], Chunk[Byte]](Chunk.empty)(_ ++ _))
         .map { c =>
           val bytes = c.toArray
           val s = new String(bytes, StandardCharsets.UTF_8)
