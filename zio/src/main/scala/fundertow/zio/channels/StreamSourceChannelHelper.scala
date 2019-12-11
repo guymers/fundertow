@@ -27,7 +27,7 @@ object StreamSourceChannelHelper {
     ZStream.managed(channel)
       .mapM { channel => setup(byteBufferPool, channel, capacity) }
       .flatMap { case (completion, queue) =>
-        new ZStream(process(completion, queue))
+        ZStream(process(completion, queue))
       }
   }
 
@@ -64,9 +64,9 @@ object StreamSourceChannelHelper {
 
     runtime <- ZIO.runtime[Any]
     _ <- ZIO.effect {
-      // TODO channel.getCloseSetter ?
       channel.getCloseSetter.set(new ChannelListener[StreamSourceChannel] {
         override def handleEvent(channel: StreamSourceChannel): Unit = {
+          println("channel.getCloseSetter")
           ()
         }
       })
@@ -76,7 +76,7 @@ object StreamSourceChannelHelper {
       // same logic as io.undertow.io.AsyncReceiverImpl:518
       channel.getReadSetter.set(new ChannelListener[StreamSourceChannel] {
         override def handleEvent(channel: StreamSourceChannel): Unit = {
-          val zio = for {
+          val readBytes = for {
             done <- completion.isDone
             paused <- queue.isPaused
             _ <- if (done || paused) ZIO.unit else {
@@ -85,10 +85,10 @@ object StreamSourceChannelHelper {
               }
             }
           } yield ()
-          runtime.unsafeRunAsync(zio) {
+          runtime.unsafeRunAsync(readBytes) {
             case Exit.Success(_) => ()
-            case Exit.Failure(cause) if cause.interrupted => ()
-            case Exit.Failure(cause) => val _ = runtime.unsafeRun(completion.fail(cause.squash))
+//            case Exit.Failure(cause) if cause.interrupted => () FIXME decide if this should be deleted
+            case Exit.Failure(cause) => val _ = runtime.unsafeRun(completion.halt(cause))
           }
         }
       })
@@ -118,7 +118,7 @@ object StreamSourceChannelHelper {
           } else if (res == 0) {
             ZIO.succeed(res)
           } else for {
-            data <- ZIO.effect {
+            data <- ZIO.effectTotal {
               buffer.flip()
               val data = Array.ofDim[Byte](buffer.remaining())
               buffer.get(data)

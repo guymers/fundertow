@@ -17,9 +17,10 @@ import io.undertow.server.handlers.HttpContinueAcceptingHandler
 import io.undertow.util.Headers
 import org.slf4j.LoggerFactory
 import zio.Chunk
-import zio.ZIO
-import zio.Runtime
 import zio.Task
+import zio.ZEnv
+import zio.ZIO
+import zio.ZManaged
 import zio.stream.ZSink
 import zio.stream.ZStream
 
@@ -27,22 +28,20 @@ object Main extends App {
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
-  override def run(args: List[String]): ZIO[Environment, Nothing, Int] = {
+  override def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = {
     logger.info("Starting server")
     super.run(args)
   }
 
-  override def createHandler(runtime: Runtime[Environment]): HttpHandler = {
-    val router = new RoutingHandler()
-    router.get("/ping", pong)
-    router.post("/post/single", HttpHandlerFactory.single(runtime) { request =>
+  override def createHandler: ZManaged[ZEnv, Nothing, HttpHandler] = (for {
+    postSingle <- HttpHandlerFactory.single { request =>
       request.body.map { bytes =>
         val s = new String(bytes, StandardCharsets.UTF_8)
 
         Response[Task](HttpStatus.Ok, HttpHeaders.empty, ZIO.succeed(Array.emptyByteArray)).withBody(s)
       }
-    })
-    router.post("/post/stream", HttpHandlerFactory.stream(runtime) { request =>
+    }
+    postStream <- HttpHandlerFactory.stream { request =>
       request.body
         .map(Chunk.fromArray)
         .run(ZSink.foldLeft[Chunk[Byte], Chunk[Byte]](Chunk.empty)(_ ++ _))
@@ -52,7 +51,12 @@ object Main extends App {
 
           Response[ZStream[Any, Throwable, ?]](HttpStatus.Ok, HttpHeaders.empty, ZStream.empty).withBody(s)
         }
-    })
+    }
+  } yield {
+    val router = new RoutingHandler()
+    router.get("/ping", pong)
+    router.post("/post/single", postSingle)
+    router.post("/post/stream", postStream)
     router.post("/post", new HttpHandler {
       override def handleRequest(exchange: HttpServerExchange): Unit = {
         exchange.getRequestReceiver.receiveFullString(
@@ -77,7 +81,7 @@ object Main extends App {
         exchange.getResponseSender.send("setFallbackHandler")
       }
     })
-    router.setFallbackHandler(new HttpHandler {
+    router.setInvalidMethodHandler(new HttpHandler {
       override def handleRequest(exchange: HttpServerExchange): Unit = {
         exchange.setStatusCode(405)
         exchange.getResponseSender.send("setInvalidMethodHandler")
@@ -90,7 +94,7 @@ object Main extends App {
     handlerChain.foldRight(router: HttpHandler) { case (f, handler) =>
       f(handler)
     }
-  }
+  }).toManaged_
 
   private val pong: HttpHandler = new HttpHandler {
     override def handleRequest(exchange: HttpServerExchange): Unit = {

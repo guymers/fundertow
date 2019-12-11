@@ -5,16 +5,19 @@ import zio._
 object PauseAndResumeQueue {
 
   /**
-    * Create a Queue that calls `pause` when it nears capacity
-    * and `resume` when the queue falls back below half capacity.
+    * A Queue that calls `pause` when it nears capacity and `resume` when the
+    * queue falls back below half capacity.
+    *
+    * Capacity must be greater than or equal to 8 and should be a power of 2
+    * for efficiency.
     */
   def apply[E, A](capacity: Int)(
     pause: ZIO[Any, E, Unit],
     resume: ZIO[Any, E, Unit]
   ): ZIO[Any, Nothing, PauseAndResumeQueue[E, A]] = for {
+    _ <- ZIO.effectTotal(require(capacity >= 8)) // FIXME
     pausedR <- Ref.make(false)
     pausedS <- Semaphore.make(1)
-    _ <- ZIO.effectTotal(require(capacity >= 8)) // FIXME
     q <- Queue.bounded[A](capacity)
   } yield {
     val safePause = pausedS.withPermit(for {

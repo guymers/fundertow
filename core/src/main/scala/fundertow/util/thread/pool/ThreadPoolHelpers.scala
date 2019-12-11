@@ -2,7 +2,7 @@ package fundertow.util.thread.pool
 
 import java.util.concurrent.{ExecutorService, TimeUnit}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.Duration
 
 object ThreadPoolHelpers {
 
@@ -13,7 +13,7 @@ object ThreadPoolHelpers {
     *
     * @see https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html
     */
-  def shutdownAndAwaitTermination(pool: ExecutorService, timeout: FiniteDuration): Boolean = {
+  def shutdownAndAwaitTermination(pool: ExecutorService, timeout: Duration): Boolean = {
     pool.shutdown() // Disable new tasks from being submitted
 
     // Wait a while for existing tasks to terminate

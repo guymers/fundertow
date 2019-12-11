@@ -1,5 +1,5 @@
-val zioVersion = "1.0.0-RC14"
-val undertowVersion = "2.0.26.Final"
+val zioVersion = "1.0.0-RC17"
+val undertowVersion = "2.0.28.Final"
 
 lazy val IntegrationTest = config("it") extend Test
 
@@ -23,7 +23,7 @@ def filterScalacConsoleOpts(options: Seq[String]) = {
 
 lazy val commonSettings = Seq(
   scalaVersion := "2.12.10",
-  crossScalaVersions := Seq("2.11.12", scalaVersion.value, "2.13.1"),
+  crossScalaVersions := Seq("2.11.12", "2.12.10", "2.13.1"),
 
   // https://tpolecat.github.io/2017/04/25/scalac-flags.html
   scalacOptions ++= Seq(
