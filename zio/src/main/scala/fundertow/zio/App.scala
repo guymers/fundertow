@@ -1,7 +1,5 @@
 package fundertow.zio
 
-import java.util.concurrent.TimeUnit
-
 import io.undertow.Undertow
 import io.undertow.UndertowOptions
 import io.undertow.server.HttpHandler

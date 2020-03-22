@@ -16,13 +16,13 @@ object ResponseBodyEncoder {
 
   // orphans; see https://blog.7mind.io/no-more-orphans.html
   // FIXME test this
-  implicit val stringUTF8ZIO: ResponseBodyEncoder[zio.Task, String] = {
-    stringUTF8F(zio.Task.succeed)
+  implicit val stringUTF8ZIO: ResponseBodyEncoder[zio.ZIO[Any, Throwable, ?], String] = {
+    stringUTF8F(zio.ZIO.succeed(_))
   }
 
   implicit val stringUTF8ZStream: ResponseBodyEncoder[zio.stream.ZStream[Any, Throwable, ?], String] = {
     // explict type for Scala 2.11
-    stringUTF8F[zio.stream.ZStream[Any, Throwable, ?]](zio.stream.ZStream.succeed)
+    stringUTF8F(zio.stream.ZStream.succeed(_))
   }
 }
 

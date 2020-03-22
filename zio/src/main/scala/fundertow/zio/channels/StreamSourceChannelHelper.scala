@@ -35,22 +35,29 @@ object StreamSourceChannelHelper {
   private def process[R, A](
     completion: Promise[Throwable, Unit],
     q: PauseAndResumeQueue[Throwable, A]
-  ): ZManaged[R, Throwable, Pull[Any, Throwable, A]] = for {
-    _ <- ZManaged.finalizer(q.shutdown)
-    _ <- completion.await.ensuring(q.size.flatMap(n => if (n <= 0) q.shutdown else UIO.unit)).fork.toManaged_
+  ): ZManaged[R, Nothing, Pull[Any, Throwable, A]] = for {
+    _: Unit <- ZManaged.finalizer(q.shutdown)
+    _ <- completion.await.run
+      .ensuring(q.size.flatMap(n => if (n <= 0) q.shutdown else UIO.unit))
+      .toManaged_.fork
   } yield {
-    val take = q.take.flatMap(Pull.emit)
+    val take = q.take.mapError(Some(_)).flatMap(v => Pull.emit(v))
 
     q.size.flatMap { n =>
       if (n <= 0) completion.isDone.flatMap {
-        case true  => completion.await.foldM(Pull.fail, _ => Pull.end)
+        case true  => completion.await.foldM(Pull.fail(_), _ => Pull.end)
         case false => take
       } else take
-    }.orElse(
-      completion.poll.flatMap {
-        case None     => Pull.end
-        case Some(io) => io.foldM(Pull.fail, _ => Pull.end)
-      }
+    }.foldCauseM(
+      cause => if (cause.interruptedOnly) {
+        completion.poll.flatMap {
+          case None     => Pull.end
+          case Some(io) => io.foldM(Pull.fail(_), _ => Pull.end)
+        }
+      } else {
+        ZIO.halt(cause)
+      },
+      ZIO.succeed(_)
     )
   }
 

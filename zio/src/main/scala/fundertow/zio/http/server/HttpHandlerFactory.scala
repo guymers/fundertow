@@ -114,8 +114,8 @@ object HttpHandlerFactory {
           val _ = exchange.dispatch(SameThreadExecutor.INSTANCE, new Runnable {
             override def run(): Unit = {
               runtime.unsafeRunAsync(t) {
-                case Exit.Success(()) => ()
-                case Exit.Failure(Cause.Empty) => ()
+                case Exit.Success(_) => ()
+                case Exit.Failure(Cause.empty) => ()
                 case Exit.Failure(cause) => runtime.platform.reportFailure(cause)
               }
             }
