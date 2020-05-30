@@ -8,7 +8,7 @@ import io.undertow.util.HeaderMap
 import io.undertow.util.HeaderValues
 import io.undertow.util.HttpString
 
-// FIXME make this better, probably copy headers from http4s, they are awesome
+// FIXME make this better, maybe copy headers from http4s
 final class HttpHeaders private (private val headers: HeaderMap) extends AnyVal {
 
   def size: Int = headers.size

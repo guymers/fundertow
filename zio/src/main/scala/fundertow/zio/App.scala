@@ -29,7 +29,7 @@ trait App extends ZIOApp {
 
   def createHandler: ZManaged[ZEnv, Nothing, HttpHandler]
 
-  override def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = {
+  override def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] = {
     (for {
       handler <- createHandler
       server <- createServer(worker, handler)

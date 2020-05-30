@@ -3,6 +3,7 @@ package fundertow.example
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 
+import fundertow.Id
 import fundertow.http.HttpHeaders
 import fundertow.http.HttpStatus
 import fundertow.http.server.Response
@@ -17,6 +18,7 @@ import io.undertow.server.handlers.HttpContinueAcceptingHandler
 import io.undertow.util.Headers
 import org.slf4j.LoggerFactory
 import zio.Chunk
+import zio.ExitCode
 import zio.Task
 import zio.ZEnv
 import zio.ZIO
@@ -28,7 +30,7 @@ object Main extends App {
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
-  override def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = {
+  override def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] = {
     logger.info("Starting server")
     super.run(args)
   }
@@ -38,25 +40,31 @@ object Main extends App {
       request.body.map { bytes =>
         val s = new String(bytes, StandardCharsets.UTF_8)
 
-        Response[Task](HttpStatus.Ok, HttpHeaders.empty, ZIO.succeed(Array.emptyByteArray)).withBody(s)
+        Response[Task, Array](HttpStatus.Ok, HttpHeaders.empty, ZIO.succeed(Array.emptyByteArray)).withBody(s)
       }
     }
     postStream <- HttpHandlerFactory.stream { request =>
       request.body
-        .map(Chunk.fromArray)
-        .run(ZSink.foldLeft[Chunk[Byte], Chunk[Byte]](Chunk.empty)(_ ++ _))
+        .run(ZSink.foldLeftChunks[Byte, Chunk[Byte]](Chunk.empty)(_ ++ _))
         .map { c =>
           val bytes = c.toArray
           val s = new String(bytes, StandardCharsets.UTF_8)
 
-          Response[ZStream[Any, Throwable, ?]](HttpStatus.Ok, HttpHeaders.empty, ZStream.empty).withBody(s)
+          Response[ZStream[Any, Throwable, ?], Id](HttpStatus.Ok, HttpHeaders.empty, ZStream.empty).withBody(s)
         }
+    }
+    postStreamPassthrough <- HttpHandlerFactory.stream { request =>
+      ZIO.succeed {
+        val headers = HttpHeaders(request.headers.toHeaderMap)
+        Response[ZStream[Any, Throwable, ?], Id](HttpStatus.Ok, headers, request.body)
+      }
     }
   } yield {
     val router = new RoutingHandler()
     router.get("/ping", pong)
     router.post("/post/single", postSingle)
     router.post("/post/stream", postStream)
+    router.post("/post/stream/passthrough", postStreamPassthrough)
     router.post("/post", new HttpHandler {
       override def handleRequest(exchange: HttpServerExchange): Unit = {
         exchange.getRequestReceiver.receiveFullString(

@@ -1,10 +1,12 @@
 package fundertow.zio.http.server
 
+import java.io.Closeable
 import java.io.IOException
 import java.nio.ByteBuffer
 
 import scala.collection.JavaConverters._
 
+import fundertow.Id
 import fundertow.http.HttpHeaders
 import fundertow.http.HttpMethod
 import fundertow.http.HttpStatus
@@ -12,6 +14,7 @@ import fundertow.http.HttpVersion
 import fundertow.http.server.Request
 import fundertow.http.server.Response
 import fundertow.zio.channels.StreamSourceChannelHelper
+import fundertow.zio.util.ByteBufferProvider
 import io.undertow.io.IoCallback
 import io.undertow.io.Receiver.ErrorCallback
 import io.undertow.io.Receiver.FullBytesCallback
@@ -26,7 +29,7 @@ import zio.stream.ZStream
 object HttpHandlerFactory {
 
   def single[R, E](
-    f: Request[Task] => ZIO[R, E, Response[Task]]
+    f: Request[Task, Array] => ZIO[R, E, Response[Task, Array]]
   ): ZIO[R, Nothing, HttpHandler] = {
     createHttpHandler { exchange =>
       val body = Task.effectAsyncInterrupt[Array[Byte]] { cb =>
@@ -38,7 +41,7 @@ object HttpHandlerFactory {
             override def error(exchange: HttpServerExchange, e: IOException): Unit = cb(ZIO.fail(e))
           }
         )
-        Left(ZIO.effectTotal(exchange.endExchange()))
+        Left(ZIO.effectTotal(exchange.endExchange())) // TODO does this cancel receiveFullBytes?
       }
       val request = createRequest(exchange, body)
       f(request).flatMap { response =>
@@ -48,7 +51,7 @@ object HttpHandlerFactory {
   }
 
   def stream[R, E](
-    f: Request[ZStream[Any, Throwable, ?]] => ZIO[R, E, Response[ZStream[Any, Throwable, ?]]]
+    f: Request[ZStream[Any, Throwable, ?], Id] => ZIO[R, E, Response[ZStream[Any, Throwable, ?], Id]]
   ): ZIO[R, Nothing, HttpHandler] = {
     createHttpHandler { exchange =>
       val channel = ZIO.effect(exchange.getRequestChannel).toManaged { channel =>
@@ -57,19 +60,16 @@ object HttpHandlerFactory {
         }
       }
 
-      val body = StreamSourceChannelHelper.stream(
-        exchange.getConnection.getByteBufferPool,
-        channel,
-        capacity = 128 // FIXME hard coded
-      )
-      val request = createRequest(exchange, body)
+      val layer = ByteBufferProvider.layer(exchange.getConnection.getByteBufferPool)
+      val body = ZStream.managed(channel).flatMap(StreamSourceChannelHelper.stream).provideLayer(layer)
+      val request = createRequest[ZStream[Any, Throwable, ?], Id](exchange, body)
       f(request).flatMap { response =>
         streamResponse(exchange, response)
       }
     }
   }
 
-  private def createRequest[F[_]](exchange: HttpServerExchange, body: F[Array[Byte]]) = {
+  private def createRequest[F[_], C[_]](exchange: HttpServerExchange, body: F[C[Byte]]) = {
     Request(
       version = HttpVersion.fromString(exchange.getProtocol).get, // TODO
       isSecure = exchange.isSecure,
@@ -127,48 +127,57 @@ object HttpHandlerFactory {
 
   private def sendResponse[R, E >: IOException](
     exchange: HttpServerExchange,
-    response: Response[ZIO[R, E, ?]]
+    response: Response[ZIO[R, E, ?], Array]
   ): ZIO[R, E, Unit] = for {
     _ <- setResponseHeaders(exchange, response)
-    sender <- ZIO.effectTotal {
-      exchange.getResponseSender
+    result <- withSender(exchange).use { sender =>
+      for {
+        data <- response.body
+        result <- wrapIoCallback(sender.send(ByteBuffer.wrap(data), _))
+      } yield result
     }
-    result <- response.body.flatMap { data =>
-      performIoCallback(sender.send(ByteBuffer.wrap(data), _))
-    }
-    _ <- performIoCallback(sender.close(_))
   } yield result
 
   private def streamResponse[R, E >: IOException](
     exchange: HttpServerExchange,
-    response: Response[ZStream[R, E, ?]]
+    response: Response[ZStream[R, E, ?], Id]
   ): ZIO[R, E, Unit] = for {
     _ <- setResponseHeaders(exchange, response)
-    sender <- ZIO.effectTotal {
-      exchange.getResponseSender
-    }
-    result <- {
-      val s = response.body.mapM { data =>
-        performIoCallback(sender.send(ByteBuffer.wrap(data), _))
-      } ++ ZStream.fromEffect {
-        performIoCallback(sender.close(_))
+    result <- withSender(exchange).use { sender =>
+      // FIXME hard coded randomly chosen value
+      response.body.chunkN(1024).foreachChunk { chunk =>
+        wrapIoCallback(sender.send(ByteBuffer.wrap(chunk.toArray), _))
       }
-      s.runDrain
     }
   } yield result
 
-  private def setResponseHeaders[R, E, F[_, _, _]](
+  private def withSender(exchange: HttpServerExchange) = {
+    ZIO.effectTotal {
+      exchange.getResponseSender
+    }.toManaged { sender =>
+      wrapIoCallback(sender.close(_)).catchAll { e =>
+        ZIO.effectTotal {
+          IoUtils.safeClose(new Closeable {
+            override def close(): Unit = throw e
+          })
+        }
+      }
+    }
+  }
+
+  private def setResponseHeaders[R, E, F[_, _, _], C[_]](
     exchange: HttpServerExchange,
-    response: Response[F[R, E, ?]]
+    response: Response[F[R, E, ?], C]
   ): ZIO[R, E, Unit] = ZIO.effectTotal {
     exchange.setStatusCode(response.status.code)
 
     response.headers.iterator.foreach { value =>
-      exchange.getResponseHeaders.putAll(value.getHeaderName, value.iterator().asScala.toList.asJavaCollection)
+      val values = value.iterator().asScala.toList.asJavaCollection
+      exchange.getResponseHeaders.putAll(value.getHeaderName, values)
     }
   }
 
-  private def performIoCallback(f: IoCallback => Unit): ZIO[Any, IOException, Unit] = {
+  private def wrapIoCallback(f: IoCallback => Unit): ZIO[Any, IOException, Unit] = {
     ZIO.effectAsync { cb: (ZIO[Any, IOException, Unit] => Unit) =>
       f(new IoCallback {
         override def onComplete(exchange: HttpServerExchange, s: Sender): Unit = cb(ZIO.unit)
