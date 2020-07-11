@@ -37,7 +37,6 @@ object StreamSourceChannelHelper {
     _ <- ZIO.effect {
       channel.getCloseSetter.set(new ChannelListener[StreamSourceChannel] {
         override def handleEvent(channel: StreamSourceChannel): Unit = {
-          println(s"${Thread.currentThread().getName} channel.getCloseSetter handleEvent")
           runZIO(runtime) {
             done.set(true)
           }
@@ -46,7 +45,6 @@ object StreamSourceChannelHelper {
 
       channel.getReadSetter.set(new ChannelListener[StreamSourceChannel] {
         override def handleEvent(channel: StreamSourceChannel): Unit = {
-          println(s"${Thread.currentThread().getName} channel.getReadSetter handleEvent")
           runZIO(runtime) {
             done.get.flatMap {
               case true => ZIO.unit
