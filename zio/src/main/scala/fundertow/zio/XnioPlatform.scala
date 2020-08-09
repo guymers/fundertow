@@ -18,7 +18,16 @@ object XnioPlatform {
 
     override val yieldOpCount: Int = Platform.defaultYieldOpCount
 
-    override val metrics: Option[ExecutionMetrics] = None
+    override val metrics: Option[ExecutionMetrics] = Some {
+      new ExecutionMetrics {
+        override def concurrency: Int = worker.getMXBean.getWorkerPoolSize
+        override def capacity: Int = worker.getMXBean.getMaxWorkerPoolSize
+        override def size: Int = worker.getMXBean.getWorkerQueueSize
+        override def enqueuedCount: Long = 0
+        override def dequeuedCount: Long = 0
+        override def workersCount: Int = worker.getMXBean.getBusyWorkerThreadCount
+      }
+    }
 
     override def submit(runnable: Runnable): Boolean = {
       try {
@@ -28,8 +37,6 @@ object XnioPlatform {
         case _: RejectedExecutionException => false
       }
     }
-
-    override val here = false
   }
 
 }
